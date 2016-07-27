@@ -3,11 +3,11 @@ from collections import deque #A queue
 class LMS(object):
   '''
   Basic Least Mean Squares adaptive filter.  Suppose we wish to
-  estimate a signal d(n) from noisy measurements x(n) = d(n) + w(n).
-  We make a linear estimate d^(n) = ff(x(n)).  Note that all of these
-  quantities may be complex.
+  estimate a signal d(n) from a related signal x(n).  (for example, we
+  could have noisy measurements x(n) = d(n) + v(n)) We make a linear
+  estimate d^(n) (d hat of n).
 
-  d^(n) = sum(x(n - k)*w(k) for k in range(p + 1))
+  d^(n) = sum(w(k)*x(n - k) for k in range(p + 1))
 
   where x(n) denotes the measurements, and w(k) are the coefficients
   of our filter.
