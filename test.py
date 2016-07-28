@@ -14,30 +14,31 @@ from LMS import LMS, LMS_Normalized
 
 #This method defines a function closure that uses the LMS
 #algorithm as a 1 step predictor.
-def one_step_pred_setup(F, m = 0):
+def one_step_pred_setup(F):
   '''
   F should specify an LMS instance and
-  m is the mean of the process
+  m is the mean of the process.
+
+  Note that there is an implicit prediction of 0 for x(0)
   '''
   def ff_fb(x):
     F.fb(x - ff_fb.x_hat_prev)
     x_hat = F.ff(x)
     ff_fb.x_hat_prev = x_hat
     return x_hat
-  ff_fb.x_hat_prev = m
+  ff_fb.x_hat_prev = 0
   return ff_fb
 
-def n_step_pred_setup(F, n, m = 0):
+def n_step_pred_setup(F, n):
   '''
   F should specify an LMS instance and
-  m is the mean of the process
   '''
   def ff_fb(x):
     F.fb(x - ff_fb.x_hat_prevs.pop())
     x_hat = F.ff(x)
     ff_fb.x_hat_prevs.appendleft(x_hat)
     return x_hat
-  ff_fb.x_hat_prevs = deque([m]*n)
+  ff_fb.x_hat_prevs = deque([0]*n)
   return ff_fb
 
 #--------------------------------------------
@@ -63,39 +64,45 @@ def test1():
   v = gaussian.rvs(size = N, scale = math.sqrt(sv2)) #Innovations
   d = lfilter(b, a, v) #Desired process
 
-  def test1_setup(F, m = 0):
-    '''Return the 1step prediction and the coefficients'''
+  def test1_setup(F):
+    '''Return the 1 step prediction and the coefficients'''
     def ff_fb(x):
-      F.fb(x - ff_fb.x_hat_prev)
-      x_hat = F.ff(x)
-      ff_fb.x_hat_prev = x_hat
-      return (x_hat, F.w)
-    ff_fb.x_hat_prev = m
+      F.fb(x - ff_fb.d_hat_prev)
+      d_hat = F.ff(x)
+      ff_fb.d_hat_prev = d_hat
+      return (d_hat, F.w)
+    ff_fb.d_hat_prev = 0
     return ff_fb
 
   #Initialize LMS filter and then
   #Get function closure implementing 1 step prediction
   F = LMS(mu = mu, p = p)
+  #Since we start with feedback, we should initialize it with d[0]
+  #so that the first feedback has some data history.
+  F.ff(d[0])
   ff_fb = test1_setup(F)
 
   #Run it through the filter and get the error
+  #Pay attention to the offsets.  d_hat[0] is a prediction of d[1].
+  #We implicitly predict d[0] = 0
   d_hat, w = zip(*[ff_fb(di) for di in d])
-  d_hat = np.array(d_hat)
+  d_hat = np.array([0] + list(d_hat))[:-1]
   w = np.array(w)
-
   err = (d - d_hat)
   
   plt.subplot(2,1,1)
   plt.plot(range(N), d, linewidth = 2, linestyle = ':',
            label = 'True Process')
-  plt.plot(range(N), d_hat, linewidth = 2, label = 'Prediction')
+  plt.plot(range(N), d_hat, linewidth = 2,
+           label = 'Prediction LMS')
   plt.legend()
   plt.xlabel('$n$')
   plt.ylabel('Process Value')
   plt.title('LMS $1$ Step Prediction, $\mu = %s$, $p = %d$' % (mu, p))
 
   plt.subplot(2,1,2)
-  plt.plot(range(N), err, linewidth = 2)
+  plt.plot(range(N), err, linewidth = 2, label = 'LMS Error')
+  plt.legend()
   plt.xlabel('$n$')
   plt.ylabel('Error')
   plt.title('Prediction Error')
@@ -121,15 +128,15 @@ def test2():
   '''
   np.random.seed(314)
 
-  N = 5000 #Length of data
+  N = 500 #Length of data
   beta = 0.3 #Step size modifier
-  p = 5 #Filter order
-  num_steps = 2 #Number of steps to predict ahead
+  p = 1 #Filter order
+  num_steps = 1 #Number of steps to predict ahead
 
   #Filter for generating d(n)
-  b = [2., -.3, 0.8, 1.1, 0.4]
+  b = [1]#., -.3, 0.8, 1.1, 0.4]
   a = [1, -0.1, -0.8]
-  sv2 = .5 #Innovations noise variance
+  sv2 = .25 #Innovations noise variance
 
   #scale specifies standard deviation sqrt(sv2)
   v = gaussian.rvs(size = N, scale = math.sqrt(sv2)) #Innovations

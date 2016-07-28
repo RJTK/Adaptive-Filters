@@ -44,7 +44,7 @@ class LMS(object):
     self.p = p 
 
     #The saved data queue.  Front is x[0]
-    self.x = deque([0]*(p + 1))
+    self.x = deque([0]*(p + 1), maxlen = p + 1)
 
     if w0:
       assert len(w0) == p + 1, 'w0 must be same order as filter'
@@ -57,12 +57,11 @@ class LMS(object):
   def ff(self, x_n):
     '''
     Feedforward.  Make a new prediction of d(n) based on the new
-    input x_n
+    input x(n)
     '''
     #Update the data history
-    self.x.pop() #Remove the oldest data element
-    self.x.appendleft(x_n)
-    return sum([w*x for (w, x) in zip(self.w, self.x)])
+    self.x.appendleft(x_n) #oldest data automatically removed
+    return sum([wi*xi for (wi, xi) in zip(self.w, self.x)])
 
   def fb(self, e):
     '''
@@ -71,7 +70,7 @@ class LMS(object):
     the previous prediction.
     '''
     u = self.mu*e
-    self.w = [w + u*x.conjugate() for (w, x) in zip(self.w, self.x)]
+    self.w = [wi + u*xi.conjugate() for (wi, xi) in zip(self.w, self.x)]
     return
 
 class LMS_Normalized(LMS):
@@ -104,7 +103,7 @@ class LMS_Normalized(LMS):
     feedback e.  Note that e(n) = d(n) - d^(n) must be the error on
     the previous prediction.
     '''
-    x_norm_sqrd = sum([x*x.conjugate() for x in self.x])
+    x_norm_sqrd = sum([xi*xi.conjugate() for xi in self.x])
     u = self.beta*e/(x_norm_sqrd + self.eps)
-    self.w = [w + u*x.conjugate() for (w, x) in zip(self.w, self.x)]
+    self.w = [wi + u*xi.conjugate() for (wi, xi) in zip(self.w, self.x)]
     return
