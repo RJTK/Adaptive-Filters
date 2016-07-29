@@ -101,7 +101,7 @@ class LMS_Normalized(LMS):
     '''
     Feedback.  Updates the coefficient vector w based on an error
     feedback e.  Note that e(n) = d(n) - d^(n) must be the error on
-    the previous prediction.
+    the previous output.
     '''
     x_norm_sqrd = sum([xi*xi.conjugate() for xi in self.x])
     u = self.beta*e/(x_norm_sqrd + self.eps)
