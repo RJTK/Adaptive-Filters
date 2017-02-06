@@ -10,6 +10,12 @@ In practice however these statistics are usually not known, and are time varying
      -LMS_ZA (Zero Attracting LMS.  Incorporates sparsity assumptions on w)
      -LMS_RZA (Rewighted LMS_ZA.  Reduces bias of LMS_ZA)
 
+References:
+
+__Classical LMS__: Statistical Digital Signal Processing and Modeling - Monson H. Hayes
+
+__Sparse LMS__: Chen, Yilun, Yuantao Gu, and Alfred O. Hero. "Sparse LMS for system identification." Acoustics, Speech and Signal Processing, 2009. ICASSP 2009. IEEE International Conference on. IEEE, 2009. 
+
 Example uses include tracking a time varying process, system identification, and channel identification.  These examples are given in test.py
 
 Here is an example of using the LMS filter to track a brownian motion process.
