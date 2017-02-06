@@ -10,7 +10,7 @@ from scipy.stats import norm as gaussian
 
 from collections import deque #A queue
 
-from LMS import LMS, LMS_Normalized
+from LMS import LMS, LMS_Normalized, LMS_ZA, LMS_RZA
 
 def system_identification_setup(F):
   '''
@@ -84,7 +84,7 @@ def equalizer_setup(F, rx_delay = 0):
 
 #--------------------------------------------
 
-def system_identification():
+def system_identification1():
   '''
   Runs an example of LMS filtering for 1 step prediction on a WSS
   process.  We plot the actual result, the errors, as well as the
@@ -93,13 +93,13 @@ def system_identification():
   '''
   np.random.seed(2718)
 
-  N = 500 #Length of data
+  N = 5000 #Length of data
   mu = .02 #Step size
-  p = 1 #Filter order
+  p = 2 #Filter order
 
   #Filter for generating d(n)
   b = [1.]
-  a = [1, -0.1, -0.8]
+  a = [1, -0.1, -0.8, 0.2]
   sv2 = .25 #Innovations noise variance
 
   #scale specifies standard deviation sqrt(sv2)
@@ -107,7 +107,9 @@ def system_identification():
   d = lfilter(b, a, v) #Desired process
 
   #Initialize LMS filter and then
-  F = LMS(mu = mu, p = p)
+  F = LMS(mu = mu, p = p) #Vanilla
+#  F = LMS_Normalized(p = p, beta = 0.02) #Normalized
+#  F = LMS_Sparse(p = p, mu = mu, g = 1.) #Sparse
   ff_fb = system_identification_setup(F)
 
   #Run it through the filter and get the error
@@ -118,9 +120,57 @@ def system_identification():
   
   plt.plot(range(N), w[:,0], linewidth = 2, label = '$w[0]$')
   plt.plot(range(N), w[:,1], linewidth = 2, label = '$w[1]$')
-  plt.hlines(-a[1], 0, N, linestyle = '--', label = '$-a[1]$')
+  plt.plot(range(N), w[:,2], linewidth = 2, label = '$w[2]$')
+  plt.hlines(-a[1], 0, N, linestyle = ':', label = '$-a[1]$')
   plt.hlines(-a[2], 0, N, linestyle = ':', label = '$-a[2]$')
+  plt.hlines(-a[3], 0, N, linestyle = ':', label = '$-a[3]$')
   plt.legend()
+  plt.ylim((-.5, 1))
+  plt.xlabel('$n$')
+  plt.ylabel('$w$')
+  plt.title('System Identification')
+  plt.show()
+  return
+
+def system_identification2():
+  '''
+  Runs an example of Sparse LMS filtering for 1 step prediction on a
+  WSS process.  We plot the actual result, the errors, as well as the
+  convergence to the "correct" parameters.  This is essentially doing
+  system identification.
+
+  The point of this is to compare the sparse vs non sparse LMS
+  '''
+  np.random.seed(2718)
+
+  N = 5000 #Length of data
+  mu = .005 #Step size
+  p = 9 #Filter order
+
+  #Filter for generating d(n)
+  b = [1.]
+  a = [1, -0.1, 0., 0., 0.3, 0., 0.2, 0., 0., 0., -0.3]
+  sv2 = .25 #Innovations noise variance
+
+  #scale specifies standard deviation sqrt(sv2)
+  v = gaussian.rvs(size = N, scale = math.sqrt(sv2)) #Innovations
+  d = lfilter(b, a, v) #Desired process
+
+  #Initialize LMS filter and then
+#  F = LMS_ZA(p = p, mu = mu, g = 0.01) #Sparse
+  F = LMS_RZA(p = p, mu = mu, g = 0.05, eps = 10) #Reweighted Sparse
+  ff_fb = system_identification_setup(F)
+
+  #Run it through the filter and get the error
+  #Pay attention to the offsets.  d_hat[0] is a prediction of d[1].
+  #We implicitly predict d[0] = 0
+  w = np.array([ff_fb(di) for di in d])
+  w = np.array(w)
+  
+  for i in range(p):
+    plt.plot(range(N), w[:, i], linewidth = 2)
+    plt.hlines(-a[i + 1], 0, N, linestyle = ':')
+
   plt.ylim((-.5, 1))
   plt.xlabel('$n$')
   plt.ylabel('$w$')
@@ -314,7 +364,8 @@ def channel_equalization():
   return
 
 if __name__ == '__main__':
-  system_identification()
-  tracking_example1()
-  tracking_example2()
-  channel_equalization()
+#  system_identification1()
+  system_identification2()
+#  tracking_example1()
+#  tracking_example2()
+#  channel_equalization()

@@ -1,5 +1,15 @@
 from collections import deque #A queue
 
+def sgn(x):
+  '''
+  sgn function.
+
+  sgn(x) = {x / |x| if x != 0, 0 if x = 0
+  '''
+  return (1 - 2*(x < 0))*(x != 0)
+
+
+
 class LMS(object):
   '''
   Basic Least Mean Squares adaptive filter.  Suppose we wish to
@@ -106,4 +116,86 @@ class LMS_Normalized(LMS):
     x_norm_sqrd = sum([xi*xi.conjugate() for xi in self.x])
     u = self.beta*e/(x_norm_sqrd + self.eps)
     self.w = [wi + u*xi.conjugate() for (wi, xi) in zip(self.w, self.x)]
+    return
+
+class LMS_ZA(LMS):
+  '''
+  A sparse LMS algorithm, "Zero-Attracting LMS".  We simply add a
+  g||w||_1 penalty term to the cost function.  This yields essentially
+  just stochastic subgradient descent.
+
+  Chen, Yilun, Yuantao Gu, and Alfred
+  O. Hero. "Sparse LMS for system identification." Acoustics, Speech
+  and Signal Processing, 2009. ICASSP 2009. IEEE International
+  Conference on. IEEE, 2009.
+
+  '''
+  def __init__(self, p, mu, g, w0 = None):
+    '''
+    p is the filter order, and mu is the descent rate (See LMS.__init__)
+    
+    The 'g' parameter (for gamma in Chen et. al.) specifies the size
+    of the L1 penalty.  Larger values of g will induce greater
+    sparsity.
+    '''
+    LMS.__init__(self, p = p, mu = mu, w0 = w0)
+    assert g >= 0, 'g must be non-negative'
+    self.g = float(g)
+    return
+    
+  def fb(self, e):
+    '''
+    Feedback.  Updates the coefficient vector based on an error
+    feedback e.  Note that e(n) = d(n) - d^(n) must be the error on
+    the previous output.
+    '''
+    u = self.mu*e
+    rho = self.mu*self.g
+    self.w = [wi - rho*sgn(wi) + u*xi.conjugate() for (wi, xi) in
+              zip(self.w, self.x)]
+    return
+
+class LMS_RZA(LMS):
+  '''
+  A reweighted sparse LMS algorithm, "Reweighted Zero-Attracting
+  LMS".  We add a g*sum_i[log(1 + wi/eps)] penalty term to the cost
+  function.  This will reduce the bias of the LMS_ZA
+  algorithm. subgradient descent.
+
+  Chen, Yilun, Yuantao Gu, and Alfred O. Hero. "Sparse LMS for system
+  identification." Acoustics, Speech and Signal Processing,
+  2009. ICASSP 2009. IEEE International Conference on. IEEE, 2009.
+
+  '''
+  def __init__(self, p, mu, g, eps, w0 = None):
+    '''
+    p is the filter order, and mu is the descent rate (See LMS.__init__)
+    
+    The 'g' parameter (for gamma in Chen et. al.) specifies the size
+    of the penalty.  Larger values of g will induce greater
+    sparsity.
+
+    The eps term is the bias reduction mechanism.  For taps with size
+    comparable to 1 / eps there is little shrinkage, and for taps with
+    size much less than 1 / eps the shrinkage is greater.
+
+    '''
+    LMS.__init__(self, p = p, mu = mu, w0 = w0)
+    assert g >= 0, 'g must be non-negative'
+    assert eps >= 0, 'eps must be non-negative'
+    self.g = float(g)
+    self.eps = float(eps)
+    return
+    
+  def fb(self, e):
+    '''
+    Feedback.  Updates the coefficient vector based on an error
+    feedback e.  Note that e(n) = d(n) - d^(n) must be the error on
+    the previous output.
+    '''
+    u = self.mu*e
+    rho = self.mu*self.g / self.eps
+    f = lambda wi: sgn(wi) / (1 + abs(wi) / self.eps)
+    self.w = [wi - rho*f(wi) + u*xi.conjugate() for (wi, xi) in
+              zip(self.w, self.x)]
     return
