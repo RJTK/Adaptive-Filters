@@ -8,8 +8,6 @@ def sgn(x):
   '''
   return (1 - 2*(x < 0))*(x != 0)
 
-
-
 class LMS(object):
   '''
   Basic Least Mean Squares adaptive filter.  Suppose we wish to
@@ -27,7 +25,7 @@ class LMS(object):
   more accurately track d(n).  The LMS algorithm is an approximation
   of a steepest descent adaptive algorithm, very similar to stochastic
   gradient descent.  In order to update the filter coefficients pass
-  in the error on the previous prediction to LMS.fb.
+  in the error on the previous prediction to LMS.
 
   w(k) <- w(k) + mu*e(n)*x(n - k)^*
 
