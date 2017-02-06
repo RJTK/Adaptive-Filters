@@ -364,8 +364,8 @@ def channel_equalization():
   return
 
 if __name__ == '__main__':
-#  system_identification1()
+  system_identification1()
   system_identification2()
-#  tracking_example1()
-#  tracking_example2()
-#  channel_equalization()
+  tracking_example1()
+  tracking_example2()
+  channel_equalization()
