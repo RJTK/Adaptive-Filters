@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 
 from collections import deque #A queue
 
@@ -67,14 +68,19 @@ class RLS(object):
     x = np.array(self.x).reshape(self.p + 1, 1) #Make a column vector
     w = self.w.reshape(self.p + 1, 1) #Make a column vector
 
-    u = np.dot(self.Rt_inv, x.conj()) #Intermediate value
-    g = u / (self.lmbda + np.dot(x.T, u)) #Gain vector
-    self.w = (w + e*g).reshape(self.p + 1) #Update the filter
-    
-    self.Rt_inv = l*(self.Rt_inv - np.dot(g, u.T.conj()))
-    #self.Rt_inv = l*np.dot((np.eye(self.p + 1) - np.dot(g, x.T)), 
-    #                        self.Rt_inv)
+    #---------OPTION 1----------
+    #This is more stable
+    self.Rt = self.lmbda*self.Rt + np.dot(x, x.T)
+    g = sp.linalg.solve(self.Rt, x, sym_pos = True, check_finite = False)
 
-    #It is wise to keep the covariance matrix symmetric
-    self.Rt_inv = 0.5*(self.Rt_inv + self.Rt_inv.T)
+    #---------OPTION 2----------
+    #u = np.dot(self.Rt_inv, x) #Intermediate value
+    #g = u / (self.lmbda + np.dot(x.T, u)) #Gain vector
+    #self.Rt_inv = l*(self.Rt_inv - np.dot(g, u.T))
+
+    self.w = (w + e*g).reshape(self.p + 1) #Update the filter
+    self.Rt_inv = l*np.dot((np.eye(self.p + 1) - np.dot(g, x.T)), 
+                           self.Rt_inv)
+
+    self.Rt_inv = 0.5*(self.Rt_inv + self.Rt_inv.T) #Ensure symmetry
     return

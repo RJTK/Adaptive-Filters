@@ -1,0 +1,152 @@
+\documentclass[a4paper, 12pt]{article}
+\usepackage{algorithm2e}
+\usepackage{mathtools}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumerate}
+\usepackage{hyperref}
+%\usepackage{fullpage}
+\usepackage{listings}
+\usepackage{courier}
+%\usepackage{minted}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{wrapfig}
+
+\author{Ryan J. Kinnear}
+\title{Recursive Least Squares}
+\date{\today}
+
+\def\T{\mathsf{T}}
+\def\H{\mathsf{H}}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+A derivation of the classic recursive least squares algorithm.  I have drawn in part from the book Statistical Digital Signal Processing and Modeling by Monson H. Hayes.  The derivation is done for complex valued data, but it is trivial to modify for real valued data by simply replacing $\H$ by $\T$, ignoring complex conjugates, and adding a $\frac{1}{2}$ factor to the error function $\mathcal{E}(t)$.  Also note that the \texttt{RLS.py} implements the algorithm assuming real data.
+
+\section{Classic RLS}
+Suppose we are interested in making online estimates of some signal $d(n)$.  We are given access to measurements of a related signal $x(n)$.  Suppose further that after we make our estimate of $d(n)$ using our knowledge at time $t$ (denoted $\hat{d_t}(n))$, nature either shows us the true value of $d(n)$, or tells us what error we made, so that we can determine how close our estimate was.  We will make linear estimates of $d(n)$ given $x(n)$ using an adaptive filter of order $p + 1$ as
+
+\begin{align}
+\begin{split}
+\label{eq:prediction}
+  \hat{d_t}(n) &= \sum_{\tau = 0}^{p}w_t(\tau)x(n - \tau) \\
+  &= w_t^\T x_n
+\end{split}
+\end{align}
+
+Where we have $w_t = [w_t(0) \ldots w_t(p)]^\T \in \mathbb{C}^{p + 1}$ the weight vector of the filter at time $t$, and $x_n = [x(n) \ldots x(n - p)]^\T$ the past $p + 1$ measured samples from time $n$.  Note that our convention is that every signal is $0$ prior to time $1$.  Further, we must be careful with indices.  Since we have an adaptive filter, we can view $\hat{d_t}(n)$ as a sequence both in $t$ and $n$ ($ n \le t$), where the $t$ index specifies which weight vector was used for the estimate, and $n$ specifies which $d(n)$ we were estimating.
+
+Let $e_t(n) = d(n) - \hat{d_t}(n) = d(n) - w_t^\T x_n$ be the error made predicting $d(n)$ using the filter coefficients at time $t$.  Note that it is here that we need nature to provide for us the true value of $d(n)$ (directly providing $e_t(t)$ is sufficient, as we will see).  We will design this filter by minimizing an exponentially weighted squared error loss:
+
+\begin{align}
+\begin{split}
+\label{eq:loss}
+  \mathcal{E}(t) &= \sum_{n = 1}^{t}\lambda^{n - \tau}|e_t(n)|^2 \\
+  &= (d_t - \hat{d}_t)^\H \Lambda_t (d_t - \hat{d}_t) \\
+  &= (d_t - X_t^\T w_t)^\H \Lambda_t (d_t - X_t^\T w_t).
+\end{split}
+\end{align}
+
+Where $d_t = [d(t) \ldots d(1)]^\T \in \mathbb{C}^t$, $\hat{d}_t = [\hat{d_t}(t) \ldots \hat{d_t}(1)]^\T = X_t^\T w_t$, where $X_t = [x_t \ldots x_1] \in \mathbb{C}^{(p + 1) \times t}$, $\Lambda_t = \textbf{Diag}(1, \lambda, \lambda^2, \ldots, \lambda^t) \in \mathbb{R}^{t \times t}$.  I stress again to think carefully about the indices, $\mathcal{E}(t)$ is the exponentially decaying error calculated over the entire past of given data had we used the filter at time $t$.
+
+And, hence (suppressing the time indices):
+
+$$
+\mathcal{E}(t) = d^\H \Lambda d - d^\H\Lambda X^\T w - w^\H X^* \Lambda d + w^\H X^* \Lambda X^\T w.
+$$
+
+Taking the gradient of $\mathcal{E}(t)$ with respect to $w^*$ we obtain
+
+$$
+\nabla_{w^*}\mathcal{E}(t) = X^* \Lambda X^\T w - X^\H \Lambda d.
+$$
+
+Setting this gradient to $0$ nets us the update formula for $w$:
+
+\begin{align}
+\begin{split}
+\label{eq:w_update}
+  w_{t + 1} &= (X_t^* \Lambda X_t^\T)^{-1}(X_t^\H \Lambda d) \\
+  &= R(t)^{-1}P(t).
+\end{split}
+\end{align}
+
+Notice that $R(t)$ is the correlation matrix of the exponentially weighted $x$ vector and must be positive semi-definite.  $P(t)$ is the cross correlation between the exponentially weighted $x$ vector and the desired signal $d$.  The similarity to the LMMSE estimator is clear.
+
+In order to derive an online (or recursive) update formula for $w_t$ we need to obtain a recursive formula for $R(t)^{-1}$ in terms of $R(t - 1)^{-1}$ and similarly for $P(t)$.
+
+The following are clear:
+
+\begin{align}
+R(t) &= \lambda R(t - 1) + x_t^* x_t^\T,\\
+P(t) &= \lambda P(t - 1) + d(t)x_t^*.
+\end{align}
+
+We then apply the Sherman-Morrison rank 1 update to $R(t)^{-1}$ to obtain:
+
+\begin{align*}
+  R(t)^{-1} &= [\lambda R(t - 1) + x_t^*x_t^\T]^{-1} \\
+  &= \frac{1}{\lambda}R(t - 1)^{-1} - \frac{\lambda^{-2}R(t - 1)^{-1}x_t^*x_t^\T R(t - 1)^{-1}}{1 + \lambda^{-1}x_t^\T R(t - 1)^{-1}x_t^*} \\
+  &= \frac{1}{\lambda}[I - g(t)x_t^\T]R(t - 1)^{-1}.
+\end{align*}
+
+Where
+
+ \begin{equation}
+ \label{eq:g}
+   g(t) = \frac{\lambda^{-1}R(t - 1)^{-1}x_t^*x_t}{1 + \lambda^{-1}x_t^\T R(t - 1)^{-1} x_t^*} \\
+ \end{equation}
+
+is referred to as the ``\textbf{gain vector}''.
+
+By multiplying through by the bottom of equation \ref{eq:g} and applying the first formula for $R(t)^{-1}$ above, we get the relation:
+
+\begin{equation}
+\label{eq:g2}
+  R(t)g(t) = x_t^*.
+\end{equation}
+
+Either of \ref{eq:g} or \ref{eq:g2} can be used to calculate $g(t)$, depending on whether or not you want to store both $R(t)$ and $R(t)^{-1}$.  Solving the linear system \ref{eq:g2} is more numerically stable than the direct calculation of \ref{eq:g}.  Further, since $R(t)$ is positive semi-definite, we could compute the rank 1 updates of it's Cholesky decomposition, and use this to efficiently solve \ref{eq:g2}.
+
+In any case, we are now in a position to efficiently calculate $w_{t + 1}$:
+
+\begin{align*}
+  w_{t + 1} &= R(t)^{-1}P(t) \\
+  &= R(t)^{-1}[\lambda P(t - 1) + d(t)x_t^*] \\
+  &\overset{(a)}{=} [R(t - 1)^{-1} - g(t)x_t^\T R(t - 1)^{-1}]P(t - 1) + d(t)g(t) \\
+  &= w_t - g(t)x_t^\T w_t + d(t)g(t)\\
+  &= w_t + e_t(t) g(t),
+\end{align*}
+
+where (a) uses equation \ref{eq:g2} and recall that $e_t(t) = d(t) - w_t^\T x_t$ is the error on the previous estimate of $d(t)$.  It remarkable that the only feedback necessary to calculate the least squares filter over the entire history of data is $e_t(t)$.  Furthermore, mere estimates of $e_t(t)$ are usually sufficient.
+
+It is typical to initialize $R(t)$ as $\delta I$ for some small $\delta > 0$ in order to ensure the matrix is invertible at the beginning of the recursion.  This initialization injects some bias into the algorithm, but it is quickly washed out by the exponential decay.  If prior knowledge is available it can be used to initialize $R(t)$.
+
+The summary of the algorithm is here:
+
+\begin{algorithm}[H]
+\label{alg:RLS}
+\KwData{$\delta > 0$, $\lambda \in (0, 1]$, $p \in \mathbb{N}$}
+\KwResult{$\hat{d_t}(t), t = 1, 2, \ldots$}
+\textbf{Initialize}: $R(0) = \delta I_{p + 1}$, $w_1 = 0$\\
+\For{t = 1, 2, \ldots}
+{
+  $\textbf{measure}: x(t)$ \\
+  $\hat{d_t}(t) = w_t^\T x_t$ \\
+  $\textbf{output}: \hat{d_t}(t)$ \\
+  $\textbf{measure}: e_t(t)$ \text{// An estimate will suffice} \\
+  $w_{t + 1} = w_t + e_t(t)g(t)$ \\
+  $R(t) = \lambda R(t - 1) + x_t^* x_t^\T$\\
+  $\underset{g(t)}{\textbf{solve}:} R(t)g(t) = x_t^*$\\
+  $R(t)^{-1} = \lambda^{-1}[I - g(t)x_t^\T]R(t - 1)^{-1}$\\
+  $R(t)^{-1} = \frac{1}{2}[R(t)^{-1} + R(t)^{-\T}]$ \text{// not strictly necessary}\\
+}
+\end{algorithm}
+
+A Python implementation, as well as some examples should accompany this document.  Otherwise, see \url{https://github.com/RJTK}
+
+\end{document}
