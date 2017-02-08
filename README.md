@@ -16,11 +16,15 @@ This repo currently contains implementations of:
 
 Example uses include tracking a time varying process, system identification, and channel identification.  These examples are given in test.py
 
-Here is an example of using the LMS filter to track a brownian motion process.
+An example of using the LMS filter to track a brownian motion process:
 
 ![alt tag](https://raw.githubusercontent.com/RJTK/LMS/master/tracking.png)
 
 Obviously, the filter can perform much better if the processes are Jointly WSS, or approximately so.
+
+RLS filter tracking a signal with time varying statistics:
+
+![alt tag](https://raw.githubusercontent.com/RJTK/LMS/master/RLS_tracking.png)
 
 References:
 
