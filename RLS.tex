@@ -45,7 +45,7 @@ Let $e_t(n) = d(n) - \hat{d_t}(n) = d(n) - w_t^\T x_n$ be the error made predict
 \begin{align}
 \begin{split}
 \label{eq:loss}
-  \mathcal{E}(t) &= \sum_{n = 1}^{t}\lambda^{n - \tau}|e_t(n)|^2 \\
+  \mathcal{E}(t) &= \sum_{n = 1}^{t}\lambda^{n - t}|e_t(n)|^2 \\
   &= (d_t - \hat{d}_t)^\H \Lambda_t (d_t - \hat{d}_t) \\
   &= (d_t - X_t^\T w_t)^\H \Lambda_t (d_t - X_t^\T w_t).
 \end{split}
