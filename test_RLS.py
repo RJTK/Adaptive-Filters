@@ -218,48 +218,45 @@ def tracking_example2():
 
 def tracking_example3():
   '''
-  Shows the RLS algorithm tracking a time varying process with fat
-  tailed innovations.
+  Shows the RLS algorithm tracking a process with time varying statistics.
   '''
   np.random.seed(314)
 
   N = 5000 #Length of data
-  lmbda = 0.98 #Forgetting factor
-  p_RLS = 6 #RLS Filter order
+  lmbda = .98 #Forgetting factor
+  p_RLS = 4 #RLS Filter order
 
   #Filter for generating d(n)
-  p1_T = 250. #Period of pole 1
-  p2_TA = 400. #Period of pole 2 amplitude
-  p2_TP = 600. #Period of pole 2 phase
+  p1_f = 1.35 #Frequency of pole 1
+  p2_fA = 1.1 #Frequency of pole 2 amplitude
+  p2_fP = 1.5 #Frequency of pole 2 phase
   def A(tau, t):
-    p1 = 0.75*np.sin(2*np.pi*t/p1_T) #pole 1 position
-    p2A = 0.25 + abs(0.5*np.sin(2*np.pi*t/p2_TA)) #pole 2 amplitude
-    p2P = np.exp(2*np.pi*1j*t/p2_TP) #pole 2 phase
+    a = [1, -0.1, -0.8, 0.2]
+    p1 = 0.25 + 0.75*np.sin(2*np.pi*t*p1_f) #pole 1 position
+    p2A = 0.15 + abs(0.75*np.sin(2*np.pi*t*p2_fA)) #pole 2 amplitude
+    p2P = np.exp(2*np.pi*1j*t*p2_fP) #pole 2 phase
     p2 = p2A*p2P
     p3 = p2.conj() #pole 3
     a = np.poly([p1, p2, p3])
     return -a[tau + 1]
 
-  b = [1, -0.5, .3]
+  b = [1., -.2, 0.8]
 
   B = lambda tau, t : b[tau]
   p = 3
-  q = 2
+  q = 1
 
   sv2 = 0.25 #Scale paremeter
-  beta = 2.0 #Pareto parameter
 
   #Track a time varying process
   t = np.linspace(0, 1, N)
   f = 2
 #  v = 4*np.sin(2*np.pi*f*t) + \
-#      pareto.rvs(beta, size = N, scale = math.sqrt(sv2)) #Innovations
-  v = 4*np.sin(2*np.pi*f*t) + \
-      gaussian.rvs(size = N, scale = math.sqrt(sv2)) #Innovations
-#  v = gaussian.rvs(size = N, scale = math.sqrt(sv2))
+#      gaussian.rvs(size = N, scale = math.sqrt(sv2)) #Innovations
+  v = gaussian.rvs(size = N, scale = math.sqrt(sv2))
 #  v = pareto.rvs(beta, size = N, scale = math.sqrt(sv2))
 #  d = lfilter(b, a, v) #Desired process
-  d = tvfilt(B, A, v, p, q)
+  d = tvfilt(B, A, v, p, q, t)
 
   #Initialize RLS filter and then
   #Get function closure implementing 1 step prediction
@@ -269,7 +266,79 @@ def tracking_example3():
   #Run it through the filter and get the error
   d_hat = np.array([0] + [ff_fb(di) for di in d])[:-1]
   err = (d - d_hat)
-  
+
+  plt.subplot(2,1,1)
+  plt.plot(range(N), d, linewidth = 2, linestyle = ':',
+           label = 'True Process')
+  plt.plot(range(N), d_hat, linewidth = 2, label = 'Prediction')
+  plt.legend()
+  plt.xlabel('$n$')
+  plt.ylabel('Process Value')
+  plt.title('RLS tracking a process ' \
+            '$\\lambda = %s$, $p = %d$' % (lmbda, p))
+
+  plt.subplot(2,1,2)
+  plt.plot(range(N), err, linewidth = 2)
+  plt.xlabel('$n$')
+  plt.ylabel('Error')
+  plt.title('Prediction Error')
+
+  plt.show()
+
+  F = RLS(p = p_RLS, lmbda = lmbda)
+  ff_fb = system_identification_setup(F)
+  w_hat = np.array([ff_fb(di) for di in d])
+
+  a1 = np.array([A(0, ti) for ti in t])
+  a2 = np.array([A(1, ti) for ti in t])
+  a3 = np.array([A(2, ti) for ti in t])
+  plt.plot(t, a1, linestyle = '--', label = '$a[1]$')
+  plt.plot(t, a2, linestyle = '--', label = '$a[2]$')
+  plt.plot(t, a3, linestyle = '--', label = '$a[3]$')
+  plt.plot(t, w_hat[:, 0], label = '$w[0]$')
+  plt.plot(t, w_hat[:, 1], label = '$w[1]$')
+  plt.plot(t, w_hat[:, 2], label = '$w[2]$')
+  plt.plot(t, w_hat[:, 3], label = '$w[3]$')
+  plt.legend()
+  plt.title('RLS Tracking ARMA Process, misspecified $p$')
+  plt.show()
+  return
+
+def tracking_example4():
+  '''
+  Shows the RLS algorithm tracking a process with fat tailed noise.
+  '''
+#  np.random.seed(314)
+
+  N = 1000 #Length of data
+  lmbda = 0.95 #Forgetting factor
+  p = 6 #Filter order
+
+  #Filter for generating d(n)
+  b = [1, -0.5, .3]
+  a = [1, 0.2, 0.16, -0.21, -0.0225]
+  sv2 = .25 #Innovations noise variance
+  beta = 1.5
+  psv = 0.025
+  nsv = 0.125
+
+  #Track a time varying process
+  t = np.linspace(0, 1, N)
+  f = 2
+  v = 4*np.sin(2*np.pi*f*t) + \
+      gaussian.rvs(size = N, scale = math.sqrt(sv2)) #Innovations
+  d = lfilter(b, a, v) #Desired process
+  d = d + pareto.rvs(beta, size = N, scale = math.sqrt(psv)) #fat tailed noise
+
+  #Initialize RLS filter and then
+  #Get function closure implementing 1 step prediction
+  F = RLS(p = p, lmbda = lmbda)
+  ff_fb = one_step_pred_setup(F)
+
+  #Run it through the filter and get the error
+  d_hat = np.array([0] + [ff_fb(di) for di in d])[:-1]
+  err = (d - d_hat)
+
   plt.subplot(2,1,1)
   plt.plot(range(N), d, linewidth = 2, linestyle = ':',
            label = 'True Process')
@@ -367,9 +436,10 @@ def channel_equalization():
   return
 
 if __name__ == '__main__':
-#  system_identification1()
-#  system_identification2()
-#  tracking_example1()
-#  tracking_example2()
+  # system_identification1()
+  # system_identification2()
+  # tracking_example1()
+  # tracking_example2()
   tracking_example3()
-#  channel_equalization()
+  # tracking_example4()
+  # channel_equalization()
