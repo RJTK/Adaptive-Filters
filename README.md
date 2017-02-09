@@ -22,7 +22,7 @@ An example of using the LMS filter to track a brownian motion process:
 
 Obviously, the filter can perform much better if the processes are Jointly WSS, or approximately so.
 
-RLS filter tracking a signal with time varying statistics:
+The RLS filter is a powerful tool.  RLS fits an autoregressive model, but is still able to perform approximate system identification on ARMA processes, even with a misspecified model order.
 
 ![alt tag](https://raw.githubusercontent.com/RJTK/LMS/master/RLS_tracking.png)
 
