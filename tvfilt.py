@@ -5,12 +5,13 @@ Time varying filter
 import numba
 import numpy as np
 
-def tvfilt(b, a, x, p, q):
+def tvfilt(b, a, x, p, q, time = None):
   '''
   Applies a time varying filter specified by functions b and a to x.
   There are p poles and q zeros in the filter.  e.g. for s static filter
   we may have b = [1, 1.1, -.2] in which case q = 2. And, a = [1., 0.2],
-  in which case p = 1.
+  in which case p = 1.  The 'time' input specifies a time vector.  If none,
+  we will use integers between 0 and len(x) - 1
   
   The function b(tau, t) is a function of time lag tau and current
   time t specifying the FIR coefficient.
@@ -38,12 +39,11 @@ def tvfilt(b, a, x, p, q):
   '''
   #Many errors trying to use numba :/
   #@numba.jit(cache = True, nopython = False)
-  def tvfilt_numba(b, a, x, p, q):
-    T = len(x) #Total time
+  def tvfilt_numba(b, a, x, p, q, time):
     z = [0]*p #Internal state
     x = [0]*q + x #Extend x to the left
     y = [] #Output vector
-    for t in xrange(T):
+    for i, t in enumerate(time):
       #Numba does not support list comprehensions?
       # yt_FIR, yt_IIR = 0, 0
       # for tau in range(q + 1):
@@ -51,7 +51,7 @@ def tvfilt(b, a, x, p, q):
       # for tau in range(p):
       #   yt_IIR += a(tau, t)*z[tau]
 
-      yt_FIR = sum(b(tau, t)*x[q + t - tau] for tau in range(q + 1))
+      yt_FIR = sum(b(tau, t)*x[q + i - tau] for tau in range(q + 1))
       yt_IIR = sum(a(tau, t)*z[tau] for tau in range(p))
       yt = yt_FIR + yt_IIR
       z = [yt] + z[:-1] #Append left internal state
@@ -62,6 +62,9 @@ def tvfilt(b, a, x, p, q):
   p = int(p)
   q = int(q)
 
-  y = tvfilt_numba(b, a, x, p, q)
+  if time is None:
+    time = range(len(x))
+
+  y = tvfilt_numba(b, a, x, p, q, time)
   y = np.array(y)
   return y
