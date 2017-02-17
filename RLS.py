@@ -33,8 +33,8 @@ class RLS(object):
 
     E(n) = sum_i[lmbda**(n - i) * (d(i) - d^(i))**2]
 
-    w0 specifies an initial set of weights, and delta specifies the
-    parameter for the initial covariance matrix P(0) = delta*I
+    delta specifies the parameter for the initial covariance matrix
+    P(0) = delta*I
     '''
     assert p >= 0, 'Filter order must be non-negative'
     assert (lmbda > 0) and (lmbda <= 1), 'Forgetting factor must be in (0, 1]'
@@ -68,19 +68,62 @@ class RLS(object):
     x = np.array(self.x).reshape(self.p + 1, 1) #Make a column vector
     w = self.w.reshape(self.p + 1, 1) #Make a column vector
 
-    #---------OPTION 1----------
+    #---------------------------
     #This is more stable
-    self.Rt = self.lmbda*self.Rt + np.dot(x, x.T)
-    g = sp.linalg.solve(self.Rt, x, sym_pos = True, check_finite = False)
+    #But, it completely defeats the purpose of updating Rt_inv...
+    #self.Rt = self.lmbda*self.Rt + np.dot(x, x.T)
+    #g = sp.linalg.solve(self.Rt, x, sym_pos = True, check_finite = False)
 
-    #---------OPTION 2----------
-    #u = np.dot(self.Rt_inv, x) #Intermediate value
-    #g = u / (self.lmbda + np.dot(x.T, u)) #Gain vector
-    #self.Rt_inv = l*(self.Rt_inv - np.dot(g, u.T))
+    #---------------------------
+    u = np.dot(self.Rt_inv, x) #Intermediate value
+    g = u / (self.lmbda + np.dot(x.T, u)) #Gain vector
+    self.Rt_inv = l*(self.Rt_inv - np.dot(g, u.T))
 
     self.w = (w + e*g).reshape(self.p + 1) #Update the filter
     self.Rt_inv = l*np.dot((np.eye(self.p + 1) - np.dot(g, x.T)), 
                            self.Rt_inv)
 
     self.Rt_inv = 0.5*(self.Rt_inv + self.Rt_inv.T) #Ensure symmetry
+    return
+
+def RRLS(RLS):
+  '''Regularized Recursive Least Squares adaptive filter.
+
+  d^(n) = sum(w(k)*x(n - k) for k in range(p + 1))
+
+  We use the cost function:
+
+  sum_n^t l^(n - t)(d(n) - d^(n))**2 + mu||w_t||_2^2
+
+  Which is just an L2 regularization term added to the regular LS cost
+  function.
+
+  See RLS for more details
+  '''
+  def __init__(self, p, lmbda, delta, mu):
+    '''p denotes the order of the filter.  A zero order filter makes a
+    prediction of d(n) based only on x(n), and a p order filter uses
+    x(n) ... x(n - p).
+
+    The 0 <= lmbda <= 1 paramter specifies the exponential weighting
+    of the errors.  As lmbda decreases, the data is "forgotten" more quickly.
+
+    delta specifies the parameter for the initial covariance
+    matrix P(0) = delta*I
+
+    mu is the L2 regularization parameter
+    '''
+    raise NotImplementedError
+    RLS.__init__(self, p, lmbda, delta)
+    assert mu >= 0, 'we must have mu >= 0'
+    self.mu = mu
+    del self.Rt_inv #We don't use this
+    return
+
+  def fb(self, e):
+    '''
+    Feedback.  Updates the coefficient vector w based on an error
+    feedback e.  Note that e(n) = d(n) - d^(n) must be the error on
+    the previous prediction.
+    '''
     return

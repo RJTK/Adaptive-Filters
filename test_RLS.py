@@ -307,42 +307,65 @@ def tracking_example3():
 def tracking_example4():
   '''
   Shows the RLS algorithm tracking a process with fat tailed noise.
+  We compare performance with and without a clamped input range.
+
+  Obviously, simply clipping the input range is a pretty naive method
+  for dealing with fat tailed noise.
   '''
-#  np.random.seed(314)
+  np.random.seed(2718)
 
   N = 1000 #Length of data
-  lmbda = 0.95 #Forgetting factor
+  lmbda = 0.98 #Forgetting factor
   p = 6 #Filter order
 
   #Filter for generating d(n)
   b = [1, -0.5, .3]
   a = [1, 0.2, 0.16, -0.21, -0.0225]
   sv2 = .25 #Innovations noise variance
-  beta = 1.5
+  beta = 1.25
   psv = 0.025
-  nsv = 0.125
 
-  #Track a time varying process
   t = np.linspace(0, 1, N)
   f = 2
-  v = 4*np.sin(2*np.pi*f*t) + \
+  v = 2*np.sin(2*np.pi*f*t) + \
       gaussian.rvs(size = N, scale = math.sqrt(sv2)) #Innovations
   d = lfilter(b, a, v) #Desired process
   d = d + pareto.rvs(beta, size = N, scale = math.sqrt(psv)) #fat tailed noise
 
+  def clamp(x, M, m):
+    return M*(x >= M) + m*(x <= m) + x*(x < M and x > m)
+
+  M = 4.
+  m = -4.
+  d_clamp = np.array([clamp(di, M, m) for di in d])
+
   #Initialize RLS filter and then
   #Get function closure implementing 1 step prediction
+
+  #-------CLAMPED INPUT-----------
+  F = RLS(p = p, lmbda = lmbda)
+  ff_fb = one_step_pred_setup(F)
+
+  d_hat_clamp = np.array([0] + [ff_fb(di) for di in d_clamp])[:-1]
+  err_clamp = (d - d_hat_clamp)
+  MSE_avg_clamp = np.average(abs(err_clamp)**2)
+
+  #--------UNCLAMPED INPUT---------
   F = RLS(p = p, lmbda = lmbda)
   ff_fb = one_step_pred_setup(F)
 
   #Run it through the filter and get the error
   d_hat = np.array([0] + [ff_fb(di) for di in d])[:-1]
   err = (d - d_hat)
+  MSE_avg = np.average(abs(err)**2)
 
   plt.subplot(2,1,1)
-  plt.plot(range(N), d, linewidth = 2, linestyle = ':',
+  plt.plot(range(N), d, linewidth = 1, linestyle = ':',
            label = 'True Process')
-  plt.plot(range(N), d_hat, linewidth = 2, label = 'Prediction')
+  plt.plot(range(N), d_clamp, linewidth = 1, linestyle = '--',
+           label = 'Clamped Process')
+  plt.plot(range(N), d_hat, linewidth = 1, label = 'Prediction')
+  plt.plot(range(N), d_hat_clamp, linewidth = 1, label = 'Prediction (clamped)')
   plt.legend()
   plt.xlabel('$n$')
   plt.ylabel('Process Value')
@@ -350,7 +373,13 @@ def tracking_example4():
             '$\\lambda = %s$, $p = %d$' % (lmbda, p))
 
   plt.subplot(2,1,2)
-  plt.plot(range(N), err, linewidth = 2)
+  plt.plot(range(N), err, linewidth = 2, label = 'err')
+  plt.plot(range(N), err_clamp, linewidth = 2, label = 'err (clamped)')
+  plt.hlines(MSE_avg, 0, N, linestyle = '--', label = 'MSE', linewidth = 3,
+             color = 'r')
+  plt.hlines(MSE_avg_clamp, 0, N, linestyle = '--', label = 'MSE (clamped)',
+             linewidth = 3, color = 'y')
+  plt.legend()
   plt.xlabel('$n$')
   plt.ylabel('Error')
   plt.title('Prediction Error')
@@ -436,10 +465,10 @@ def channel_equalization():
   return
 
 if __name__ == '__main__':
-  # system_identification1()
-  # system_identification2()
-  # tracking_example1()
-  # tracking_example2()
+  system_identification1()
+  system_identification2()
+  tracking_example1()
+  tracking_example2()
   tracking_example3()
-  # tracking_example4()
-  # channel_equalization()
+  tracking_example4()
+  channel_equalization()
